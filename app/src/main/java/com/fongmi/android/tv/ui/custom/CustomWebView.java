@@ -14,6 +14,7 @@ import com.tencent.smtt.export.external.interfaces.SslError;
 import com.tencent.smtt.export.external.interfaces.SslErrorHandler;
 import com.tencent.smtt.export.external.interfaces.WebResourceRequest;
 import com.tencent.smtt.export.external.interfaces.WebResourceResponse;
+import com.tencent.smtt.sdk.CookieManager;
 import com.tencent.smtt.sdk.QbSdk;
 import com.tencent.smtt.sdk.WebChromeClient;
 import com.tencent.smtt.sdk.WebView;
@@ -25,13 +26,12 @@ import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.Constant;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.Setting;
+import com.fongmi.android.tv.api.config.LiveConfig;
 import com.fongmi.android.tv.api.config.VodConfig;
-import com.fongmi.android.tv.bean.Site;
 import com.fongmi.android.tv.impl.ParseCallback;
 import com.fongmi.android.tv.ui.dialog.WebDialog;
 import com.fongmi.android.tv.utils.Sniffer;
 import com.github.catvod.crawler.Spider;
-import com.github.catvod.net.OkCookieJar;
 import com.google.common.net.HttpHeaders;
 import com.orhanobut.logger.Logger;
 
@@ -108,14 +108,13 @@ public class CustomWebView extends WebView implements DialogInterface.OnDismissL
     }
 
     private void start(String url, Map<String, String> headers) {
-        OkCookieJar.setAcceptThirdPartyCookies(this);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true);
         checkHeader(url, headers);
         loadUrl(url, headers);
     }
 
     private void checkHeader(String url, Map<String, String> headers) {
         for (String key : headers.keySet()) {
-            if (HttpHeaders.COOKIE.equalsIgnoreCase(key)) OkCookieJar.sync(url, headers.get(key));
             if (HttpHeaders.USER_AGENT.equalsIgnoreCase(key)) getSettings().setUserAgentString(headers.get(key));
         }
     }
@@ -202,15 +201,16 @@ public class CustomWebView extends WebView implements DialogInterface.OnDismissL
 
     private boolean isAd(String host) {
         for (String ad : VodConfig.get().getAds()) if (host.contains(ad)) return true;
+        for (String ad : LiveConfig.get().getAds()) if (host.contains(ad)) return true;
         for (String ad : VodConfig.get().getAds()) if (Pattern.compile(ad).matcher(host).find()) return true;
+        for (String ad : LiveConfig.get().getAds()) if (Pattern.compile(ad).matcher(host).find()) return true;
         return false;
     }
 
     private boolean isVideoFormat(String url) {
         try {
             Logger.t(TAG).d(url);
-            Site site = VodConfig.get().getSite(key);
-            Spider spider = VodConfig.get().getSpider(site);
+            Spider spider = VodConfig.get().getSite(key).spider();
             if (spider.manualVideoCheck()) return spider.isVideoFormat(url);
             return Sniffer.isVideoFormat(url);
         } catch (Exception ignored) {
